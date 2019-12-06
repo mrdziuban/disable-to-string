@@ -30,8 +30,10 @@ class DisableToString extends SemanticRule("DisableToString") {
   private def withSym[A](tree: Tree)(f: Symbol => A)(implicit doc: SemanticDocument): A =
     f(tree.symbol)
 
-  private def isStringOrShown0(sym: Symbol): Boolean =
+  private def isStringOrShown0(sym: Symbol): Boolean = {
+    // println(s"************************\n$sym\n************************")
     STRING_TPES.contains(sym)
+  }
 
   private def isStringOrShown(tpe: SemanticType)(implicit doc: SemanticDocument): Boolean =
     tpe match {
@@ -88,6 +90,7 @@ class DisableToString extends SemanticRule("DisableToString") {
 
       // Disallow string interpolation of anything but strings
       case t @ Term.Interpolate(Term.Name("s"), _, args) =>
+        println(s"*****************\n${args.map(_.symbol).mkString("\n")}\n**********************")
         args.map(a => if (isStringOrShown(a)) Patch.empty else Patch.lint(Interp(a))).asPatch
 
       // Allow the above when inside a `new Show` block

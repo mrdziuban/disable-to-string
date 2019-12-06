@@ -4,6 +4,7 @@ rule = DisableToString
 package fix
 
 import cats.{Show => CatsShow}
+import cats.instances.int._
 import cats.syntax.show._
 import scalaz.{Cord, Show => ScalazShow}
 
@@ -164,4 +165,6 @@ Only strings can be interpolated. Consider defining a `cats.Show` instance and u
 
   val showInterpToString = show"a ${Bar(1)} c".toString
   val showInterpInterp = s"${show"a ${Bar(1)} c"}"
+
+  def optionF(o: Option[Int]) = s"a ${o.map(i => show"a $i b".toString).getOrElse("")} b"
 }
