@@ -19,58 +19,89 @@ case class Interp(t: Term) extends Diagnostic {
 }
 
 class DisableToString extends SemanticRule("DisableToString") {
-  private lazy val SCALA_STRING = Symbol("scala/Predef.String#")
-  private lazy val JAVA_STRING = Symbol("java/lang/String#")
+  private lazy val STRING_TPES = Set(
+    Symbol("scala/Predef.String#"),
+    Symbol("java/lang/String#"),
+    Symbol("cats/Show.Shown."),
+    Symbol("cats/Show.Shown#"),
+    Symbol("scalaz/Cord."),
+    Symbol("scalaz/Cord#"))
 
   private def withSym[A](tree: Tree)(f: Symbol => A)(implicit doc: SemanticDocument): A =
     f(tree.symbol)
 
-  private def isString(sym: Symbol): Boolean = sym == SCALA_STRING || sym == JAVA_STRING
+  private def isStringOrShown0(sym: Symbol): Boolean =
+    STRING_TPES.contains(sym)
 
-  private def isString(arg: Term)(implicit doc: SemanticDocument): Boolean =
-    (arg, withSym(arg)(_.info.map(_.signature))) match {
-      case (Lit.String(_), _) => true
-      case (_, Some(ValueSignature(TypeRef(_, sym, _)))) => isString(sym)
-      case (_, Some(ValueSignature(SingleType(_, sym)))) => isString(sym)
-      case (_, Some(MethodSignature(_, _, TypeRef(_, sym, _)))) => isString(sym)
-      case (_, Some(MethodSignature(_, _, SingleType(_, sym)))) => isString(sym)
-      case (x, y) => false
+  private def isStringOrShown(tpe: SemanticType)(implicit doc: SemanticDocument): Boolean =
+    tpe match {
+      case TypeRef(_, sym, _) => isStringOrShown(sym)
+      case SingleType(_, sym) => isStringOrShown(sym)
+      case ThisType(sym) => isStringOrShown(sym)
+      case SuperType(_, sym) => isStringOrShown(sym)
+      case ConstantType(_: StringConstant) => true
+      case IntersectionType(tpes) => tpes.exists(isStringOrShown(_)) // TODO - is this right?
+      case UnionType(tpes) => tpes.exists(isStringOrShown(_)) // TODO - is this right?
+      case WithType(tpes) => tpes.exists(isStringOrShown(_)) // TODO - is this right?
+      case StructuralType(tpe, decls) => isStringOrShown(tpe)
+      case AnnotatedType(_, tpe) => isStringOrShown(tpe)
+      case UniversalType(_, tpe) => isStringOrShown(tpe)
+      case ByNameType(tpe) => isStringOrShown(tpe)
+      case RepeatedType(tpe) => isStringOrShown(tpe)
+      case _ => false
     }
 
-  private lazy val CATS_SHOW_TPE = Symbol("cats/Show#")
-  private lazy val SCALAZ_SHOW_TPE = Symbol("scalaz/Show#")
+  private def isStringOrShown(sym: Symbol)(implicit doc: SemanticDocument): Boolean =
+    isStringOrShown0(sym) || (sym.info.map(_.signature) match {
+      case Some(ValueSignature(tpe)) => isStringOrShown(tpe)
+      case Some(MethodSignature(_, _, tpe)) => isStringOrShown(tpe)
+      case Some(TypeSignature(_, _, tpe)) => isStringOrShown(tpe)
+      case _ => false
+    })
+
+  private def isStringOrShown(arg: Term)(implicit doc: SemanticDocument): Boolean =
+    arg match {
+      case Lit.String(_) => true
+      case t => withSym(t)(isStringOrShown(_))
+    }
+
+  private lazy val SHOW_TPES = Set(
+    Symbol("cats/Show#"),
+    Symbol("scalaz/Show#"))
 
   private def isShowTpe(tpe: Type)(implicit doc: SemanticDocument): Boolean =
-    withSym(tpe)(s => s == CATS_SHOW_TPE || s == SCALAZ_SHOW_TPE)
+    withSym(tpe)(SHOW_TPES.contains(_))
 
-  private lazy val CATS_SHOW_FUN = Symbol("cats/Show.show().")
-  private lazy val SCALAZ_SHOW_FUN = Symbol("scalaz/Show.show().")
-  private lazy val SCALAZ_SHOWS_FUN = Symbol("scalaz/Show.shows().")
+  private lazy val SHOW_FNS = Set(
+    Symbol("cats/Show.show()."),
+    Symbol("scalaz/Show.show()."),
+    Symbol("scalaz/Show.shows()."))
 
-  private def isShowFunc(fn: Term)(implicit doc: SemanticDocument): Boolean =
-    withSym(fn)(s => s == CATS_SHOW_FUN || s == SCALAZ_SHOW_FUN || s == SCALAZ_SHOWS_FUN)
+  private def isShowFn(fn: Term)(implicit doc: SemanticDocument): Boolean =
+    withSym(fn)(SHOW_FNS.contains(_))
 
   private def fixTree(tree: Tree)(implicit doc: SemanticDocument): Patch = {
     tree match {
       // Disallow calls to `.toString`
-      case t @ Term.Select(_, Term.Name("toString")) =>
+      case t @ Term.Select(term, Term.Name("toString")) if !isStringOrShown(term) =>
         Patch.lint(ToString(t))
 
       // Disallow string interpolation of anything but strings
       case t @ Term.Interpolate(Term.Name("s"), _, args) =>
-        args.map(a => if (isString(a)) Patch.empty else Patch.lint(Interp(a))).asPatch
+        args.map(a => if (isStringOrShown(a)) Patch.empty else Patch.lint(Interp(a))).asPatch
 
       // Allow the above when inside a `new Show` block
       case Term.NewAnonymous(t @ Template(_, List(Init(Type.Apply(tpe, _), _, _)), _, _)) if isShowTpe(tpe) =>
         Patch.empty
 
       // Allow the above when inside a `Show.show` or `Show.shows` call
-      case Term.Apply(fn, _) if isShowFunc(fn) =>
+      case Term.Apply(fn, _) if isShowFn(fn) =>
         Patch.empty
 
       case _ => tree.children.map(fixTree(_)).asPatch
     }
   }
 
-  override def fix(implicit doc: SemanticDocument): Patch = fixTree(doc.tree).atomic
+  override def fix(implicit doc: SemanticDocument): Patch =
+    fixTree(doc.tree).atomic
 }

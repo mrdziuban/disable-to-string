@@ -146,4 +146,22 @@ Only strings can be interpolated. Consider defining a `cats.Show` instance and u
 
   // val allowedToString = Foo("foo").toString
   // val allowedInterp = s"a ${Bar(1)} b"
+
+  def badSingleton[S <: Singleton](s: S) = s"a $s b"/* assert: DisableToString
+                                                ^
+Only strings can be interpolated. Consider defining a `cats.Show` instance and using `show"..."` from `cats.syntax.show._`
+*/
+  def goodSingleton[S <: Singleton with String](s: S) = s"a $s b"
+
+  val cordToString = Cord("foo").toString
+  val shownToString = CatsShow.Shown("bar").toString
+
+  val cordInterp = s"a ${Cord("foo")} b"
+  val shownInterp = s"a ${CatsShow.Shown("bar")} b"
+
+  def cordFToString(x: Cord) = s"a $x b"
+  def shownFToString(x: CatsShow.Shown) = s"a $x b"
+
+  val showInterpToString = show"a ${Bar(1)} c".toString
+  val showInterpInterp = s"${show"a ${Bar(1)} c"}"
 }
