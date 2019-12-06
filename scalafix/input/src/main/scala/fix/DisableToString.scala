@@ -1,7 +1,7 @@
 /*
 rule = DisableToString
 */
-package com.mrdziuban
+package fix
 
 import cats.{Show => CatsShow}
 import cats.syntax.show._
