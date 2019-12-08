@@ -1,6 +1,7 @@
 lazy val V = _root_.scalafix.sbt.BuildInfo
 
 Global / onChangedBuildSource := ReloadOnSourceChanges
+ThisBuild / classLoaderLayeringStrategy := ClassLoaderLayeringStrategy.ScalaLibrary
 
 inThisBuild(
   List(
@@ -14,20 +15,28 @@ inThisBuild(
     scalacOptions ++= List(
       "-Yrangepos",
       "-P:semanticdb:synthetics:on"
+    ),
+    scalacOptions --= Seq(
+      "-language:existentials",
+      "-language:experimental.macros",
+      "-language:implicitConversions"
     )
   )
 )
 
 skip in publish := true
 
-lazy val rules = project.settings(
-  moduleName := "scalafix",
-  libraryDependencies += "ch.epfl.scala" %% "scalafix-core" % V.scalafixVersion
-)
-
 lazy val libs = Seq(
   "org.scalaz" %% "scalaz-core" % "7.2.28",
   "org.typelevel" %% "cats-core" % "2.0.0"
+)
+
+lazy val rules = project.settings(
+  moduleName := "scalafix",
+  libraryDependencies ++= Seq(
+    "ch.epfl.scala" %% "scalafix-core" % V.scalafixVersion,
+    "ch.epfl.scala" %% "scalafix-rules" % V.scalafixVersion
+  ) ++ libs
 )
 
 lazy val input = project.settings(
