@@ -40,10 +40,10 @@ class DisableToString(global: ScalafixGlobal) extends SemanticRule("DisableToStr
 
   private lazy val SINGLETON_STRING_TPE = global.typeOf[Singleton with String]
 
-  private def pos(term: Term, unit: global.CompilationUnit): ScalaPosition =
+  private def pos(term: Term, unit: ScalafixGlobal#CompilationUnit): ScalaPosition =
     global.rangePos(unit.source, term.pos.start, term.pos.start, term.pos.end)
 
-  private def isStringOrShown(term: Term, unit: global.CompilationUnit): Boolean =
+  private def isStringOrShown(term: Term, unit: ScalafixGlobal#CompilationUnit): Boolean =
     term match {
       case Lit.String(_) => true
       case _ =>
@@ -66,7 +66,7 @@ class DisableToString(global: ScalafixGlobal) extends SemanticRule("DisableToStr
   private def isShowFn(fn: Term)(implicit doc: SemanticDocument): Boolean =
     SHOW_FNS.contains(fn.symbol)
 
-  private def fixTree(tree: Tree, unit: global.CompilationUnit)(implicit doc: SemanticDocument): Patch = {
+  private def fixTree(tree: Tree, unit: ScalafixGlobal#CompilationUnit)(implicit doc: SemanticDocument): Patch = {
     tree match {
       // Disallow calls to `.toString` on anything but String/Shown/Cord
       case t @ Term.Select(term, Term.Name("toString")) if !isStringOrShown(term, unit) =>
