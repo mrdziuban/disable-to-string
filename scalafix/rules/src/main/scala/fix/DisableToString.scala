@@ -1,14 +1,12 @@
 package fix
 
-import cats.Show.Shown
 import metaconfig.{Conf, Configured}
 import scalafix.v1._
 import scala.meta._
 import scala.meta.internal.pc.ScalafixGlobal
 import scala.meta.internal.proxy.GlobalProxy
 import scala.reflect.internal.util.{Position => ScalaPosition}
-import scala.util.Properties
-import scalaz.Cord
+import scala.util.{Properties, Try}
 
 object code {
   def apply(s: String): String = s"`$s`"
@@ -22,7 +20,7 @@ case class ToString(t: Term.Select) extends Diagnostic {
 case class Interp(t: Term) extends Diagnostic {
   override def position: Position = t.pos
   override def message: String = s"Only strings can be interpolated. Consider defining a ${code("cats.Show")} " ++
-                                 s"instance and using ${code("""show"..."""")} from ${code("cats.syntax.show._")}"
+                                 s"instance and using ${code("""show"...".toString""")} from ${code("cats.syntax.show._")}"
 }
 
 class DisableToString(global: ScalafixGlobal) extends SemanticRule("DisableToString") {
@@ -36,10 +34,10 @@ class DisableToString(global: ScalafixGlobal) extends SemanticRule("DisableToStr
         if (c.scalacClasspath.isEmpty) null
         else ScalafixGlobal.newCompiler(c.scalacClasspath, c.scalacOptions, Map())))
 
-  private lazy val STRING_TPES = Set(
-    global.typeOf[String],
-    global.typeOf[Shown],
-    global.typeOf[Cord])
+  private lazy val STRING_TPES = Set(global.typeOf[String]) ++
+    Try(Set(global.rootMirror.staticClass("_root_.scalaz.Cord").toType)).getOrElse(Set()) ++
+    Try(Set(global.rootMirror.staticClass("_root_.cats.Show.Shown").toType)).getOrElse(Set())
+
   private lazy val SINGLETON_STRING_TPE = global.typeOf[Singleton with String]
 
   private def pos(term: Term, unit: global.CompilationUnit): ScalaPosition =
