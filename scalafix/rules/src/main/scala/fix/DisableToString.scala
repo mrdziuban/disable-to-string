@@ -2,29 +2,44 @@ package fix
 
 import metaconfig.{Conf, Configured}
 import scalafix.v1._
+import scala.annotation.tailrec
 import scala.meta._
 import scala.meta.internal.pc.ScalafixGlobal
 import scala.meta.internal.proxy.GlobalProxy
 import scala.reflect.internal.util.{Position => ScalaPosition}
 import scala.util.{Properties, Try}
+import scala.util.control.NonFatal
 
 object code {
   def apply(s: String): String = s"`$s`"
 }
 
-case class ToString(t: Term.Select) extends Diagnostic {
-  override def position: Position = t.pos
-  override def message: String = s"Calls to ${code(".toString")} are disabled, use ${code("cats.Show")}"
+case class ToString(tree: Tree, tpe: ScalafixGlobal#Type) extends Diagnostic {
+  override def position: Position = tree.pos
+  override def message: String = s"Don't call ${code(s"$tpe.toString")}, use ${code("cats.Show")}"
 }
 
-case class Interp(t: Term) extends Diagnostic {
-  override def position: Position = t.pos
-  override def message: String = s"Only strings can be interpolated. Consider defining a ${code("cats.Show")} " ++
-                                 s"instance and using ${code("""show"...".toString""")} from ${code("cats.syntax.show._")}"
+case class Interp(tree: Tree, tpe: ScalafixGlobal#Type) extends Diagnostic {
+  override def position: Position = tree.pos
+  override def message: String = s"Only strings can be interpolated. Consider defining a ${code(s"cats.Show[$tpe]")} " ++
+                                 s"instance and using ${code("""show"..."""")} from ${code("cats.syntax.show._")}"
 }
 
 class DisableToString(global: ScalafixGlobal) extends SemanticRule("DisableToString") {
   def this() = this(null)
+
+  override def afterComplete(): Unit = shutdownCompiler()
+
+  private def shutdownCompiler(): Unit = {
+    if (global != null) {
+      try {
+        global.askShutdown()
+        global.close()
+      } catch {
+        case NonFatal(_) =>
+      }
+    }
+  }
 
   override def withConfiguration(c: Configuration): Configured[Rule] =
     if (c.scalacClasspath.nonEmpty && c.scalaVersion != Properties.versionNumberString)
@@ -34,21 +49,33 @@ class DisableToString(global: ScalafixGlobal) extends SemanticRule("DisableToStr
         if (c.scalacClasspath.isEmpty) null
         else ScalafixGlobal.newCompiler(c.scalacClasspath, c.scalacOptions, Map())))
 
-  private lazy val STRING_TPES = Set(global.typeOf[String]) ++
+  private lazy val STRING_TPE = global.typeOf[String]
+  private lazy val STRING_TPES = Set(STRING_TPE) ++
     Try(Set(global.rootMirror.staticClass("_root_.scalaz.Cord").toType)).getOrElse(Set()) ++
     Try(Set(global.rootMirror.staticClass("_root_.cats.Show.Shown").toType)).getOrElse(Set())
 
-  private lazy val SINGLETON_STRING_TPE = global.typeOf[Singleton with String]
-
-  private def pos(term: Term, unit: ScalafixGlobal#CompilationUnit): ScalaPosition =
+  private def pos(term: Term, unit: global.CompilationUnit): ScalaPosition =
     global.rangePos(unit.source, term.pos.start, term.pos.start, term.pos.end)
 
-  private def isStringOrShown(term: Term, unit: ScalafixGlobal#CompilationUnit): Boolean =
+  @tailrec private def dealiasType(t: global.Type): global.Type = t.dealias match {
+    case x if x == t => x
+    case x => dealiasType(x)
+  }
+
+  @tailrec private def widenType(t: global.Type): global.Type = t.widen match {
+    case x if x == t => x
+    case x => widenType(x)
+  }
+
+  private def getType(term: Term, unit: global.CompilationUnit): global.Type =
+    widenType(dealiasType(GlobalProxy.typedTreeAt(global, pos(term, unit)).tpe))
+
+  private def isStringOrShown(term: Term, unit: global.CompilationUnit): (Boolean, global.Type) =
     term match {
-      case Lit.String(_) => true
+      case Lit.String(_) => (true, STRING_TPE)
       case _ =>
-        val tpe = GlobalProxy.typedTreeAt(global, pos(term, unit)).tpe
-        STRING_TPES.exists(t => t =:= tpe || tpe <:< SINGLETON_STRING_TPE)
+        val tpe = getType(term, unit)
+        (STRING_TPES.exists(t => t =:= tpe || tpe <:< t), tpe)
     }
 
   private lazy val SHOW_TPES = Set(
@@ -66,15 +93,19 @@ class DisableToString(global: ScalafixGlobal) extends SemanticRule("DisableToStr
   private def isShowFn(fn: Term)(implicit doc: SemanticDocument): Boolean =
     SHOW_FNS.contains(fn.symbol)
 
-  private def fixTree(tree: Tree, unit: ScalafixGlobal#CompilationUnit)(implicit doc: SemanticDocument): Patch = {
+  private def fixTree(tree: Tree, unit: global.CompilationUnit)(implicit doc: SemanticDocument): Patch = {
     tree match {
       // Disallow calls to `.toString` on anything but String/Shown/Cord
-      case t @ Term.Select(term, Term.Name("toString")) if !isStringOrShown(term, unit) =>
-        Patch.lint(ToString(t))
+      case t @ Term.Select(term, Term.Name("toString")) =>
+        val (isStr, tpe) = isStringOrShown(term, unit)
+        if (isStr) Patch.empty else Patch.lint(ToString(t, tpe))
 
       // Disallow string interpolation of anything but String/Shown/Cord
       case Term.Interpolate(Term.Name("s"), _, args) =>
-        args.map(a => if (isStringOrShown(a, unit)) Patch.empty else Patch.lint(Interp(a))).asPatch
+        args.map { a =>
+          val (isStr, tpe) = isStringOrShown(a, unit)
+          if (isStr) Patch.empty else Patch.lint(Interp(a, tpe))
+        }.asPatch
 
       // Allow the above when inside a `new Show` block
       case Term.NewAnonymous(Template(_, List(Init(Type.Apply(tpe, _), _, _)), _, _)) if isShowTpe(tpe) =>
@@ -88,9 +119,8 @@ class DisableToString(global: ScalafixGlobal) extends SemanticRule("DisableToStr
     }
   }
 
-  override def fix(implicit doc: SemanticDocument): Patch = {
+  override def fix(implicit doc: SemanticDocument): Patch =
     fixTree(doc.tree, global.newCompilationUnit(doc.input.text, doc.input.syntax)).atomic
-  }
 }
 
 object DisableToString

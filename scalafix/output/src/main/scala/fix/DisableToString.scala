@@ -97,9 +97,6 @@ object DisableToString {
   val showInterpBarVal = show"a $barVal b"
   val showInterpBarDef = show"a ${barDef()} b"
 
-  // val allowedToString = Foo("foo").toString
-  // val allowedInterp = s"a ${Bar(1)} b"
-
   def badSingleton[S <: Singleton](s: S) = s"a $s b"
   def goodSingleton[S <: Singleton with String](s: S) = s"a $s b"
 

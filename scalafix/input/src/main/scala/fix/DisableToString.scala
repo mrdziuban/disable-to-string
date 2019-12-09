@@ -67,7 +67,7 @@ object DisableToString {
   val stringLitVal = "1"
   val stringVal = 1.toString/* assert: DisableToString
                   ^^^^^^^^^^
-Calls to `.toString` are disabled, use `cats.Show`
+Don't call `Int.toString`, use `cats.Show`
 */
   def stringDef() = "1"
   val interpString = s"a $stringLitVal b $stringVal c ${stringDef()} d"
@@ -76,45 +76,45 @@ Calls to `.toString` are disabled, use `cats.Show`
   def intDef() = 1
   val interpIntLit = s"a ${1} b"/* assert: DisableToString
                            ^
-Only strings can be interpolated. Consider defining a `cats.Show` instance and using `show"...".toString` from `cats.syntax.show._`
+Only strings can be interpolated. Consider defining a `cats.Show[Int]` instance and using `show"..."` from `cats.syntax.show._`
 */
   val interpIntVal = s"a $intVal b"/* assert: DisableToString
                           ^^^^^^
-Only strings can be interpolated. Consider defining a `cats.Show` instance and using `show"...".toString` from `cats.syntax.show._`
+Only strings can be interpolated. Consider defining a `cats.Show[Int]` instance and using `show"..."` from `cats.syntax.show._`
 */
   val interpIntDef = s"a ${intDef()} b"/* assert: DisableToString
                            ^^^^^^^^
-Only strings can be interpolated. Consider defining a `cats.Show` instance and using `show"...".toString` from `cats.syntax.show._`
+Only strings can be interpolated. Consider defining a `cats.Show[Int]` instance and using `show"..."` from `cats.syntax.show._`
 */
 
   val boolVal = true
   def boolDef() = false
   val interpBoolLit = s"a ${true} b"/* assert: DisableToString
                             ^^^^
-Only strings can be interpolated. Consider defining a `cats.Show` instance and using `show"...".toString` from `cats.syntax.show._`
+Only strings can be interpolated. Consider defining a `cats.Show[Boolean]` instance and using `show"..."` from `cats.syntax.show._`
 */
   val interpBoolVal = s"a $boolVal b"/* assert: DisableToString
                            ^^^^^^^
-Only strings can be interpolated. Consider defining a `cats.Show` instance and using `show"...".toString` from `cats.syntax.show._`
+Only strings can be interpolated. Consider defining a `cats.Show[Boolean]` instance and using `show"..."` from `cats.syntax.show._`
 */
   val interpBoolDef = s"a ${boolDef()} b"/* assert: DisableToString
                             ^^^^^^^^^
-Only strings can be interpolated. Consider defining a `cats.Show` instance and using `show"...".toString` from `cats.syntax.show._`
+Only strings can be interpolated. Consider defining a `cats.Show[Boolean]` instance and using `show"..."` from `cats.syntax.show._`
 */
 
   val fooVal = Foo("foo")
   def fooDef() = Foo("bar")
   val interpFooLit = s"a ${Foo("baz")} b"/* assert: DisableToString
                            ^^^^^^^^^^
-Only strings can be interpolated. Consider defining a `cats.Show` instance and using `show"...".toString` from `cats.syntax.show._`
+Only strings can be interpolated. Consider defining a `cats.Show[fix.Foo]` instance and using `show"..."` from `cats.syntax.show._`
 */
   val interpFooVal = s"a $fooVal b"/* assert: DisableToString
                           ^^^^^^
-Only strings can be interpolated. Consider defining a `cats.Show` instance and using `show"...".toString` from `cats.syntax.show._`
+Only strings can be interpolated. Consider defining a `cats.Show[fix.Foo]` instance and using `show"..."` from `cats.syntax.show._`
 */
   val interpFooDef = s"a ${fooDef()} b"/* assert: DisableToString
                            ^^^^^^^^
-Only strings can be interpolated. Consider defining a `cats.Show` instance and using `show"...".toString` from `cats.syntax.show._`
+Only strings can be interpolated. Consider defining a `cats.Show[fix.Foo]` instance and using `show"..."` from `cats.syntax.show._`
 */
   val interpFooValMember = s"a ${fooVal.s} b"
   val interpFooDefMember = s"a ${fooDef().s} b"
@@ -123,34 +123,31 @@ Only strings can be interpolated. Consider defining a `cats.Show` instance and u
   def barDef() = Bar(2)
   val interpBarLit = s"a ${Bar(3)} b"/* assert: DisableToString
                            ^^^^^^
-Only strings can be interpolated. Consider defining a `cats.Show` instance and using `show"...".toString` from `cats.syntax.show._`
+Only strings can be interpolated. Consider defining a `cats.Show[fix.Bar]` instance and using `show"..."` from `cats.syntax.show._`
 */
   val interpBarVal = s"a $barVal b"/* assert: DisableToString
                           ^^^^^^
-Only strings can be interpolated. Consider defining a `cats.Show` instance and using `show"...".toString` from `cats.syntax.show._`
+Only strings can be interpolated. Consider defining a `cats.Show[fix.Bar]` instance and using `show"..."` from `cats.syntax.show._`
 */
   val interpBarDef = s"a ${barDef()} b"/* assert: DisableToString
                            ^^^^^^^^
-Only strings can be interpolated. Consider defining a `cats.Show` instance and using `show"...".toString` from `cats.syntax.show._`
+Only strings can be interpolated. Consider defining a `cats.Show[fix.Bar]` instance and using `show"..."` from `cats.syntax.show._`
 */
   val interpBarValMember = s"a ${barVal.i} b"/* assert: DisableToString
                                  ^^^^^^^^
-Only strings can be interpolated. Consider defining a `cats.Show` instance and using `show"...".toString` from `cats.syntax.show._`
+Only strings can be interpolated. Consider defining a `cats.Show[Int]` instance and using `show"..."` from `cats.syntax.show._`
 */
   val interpBarDefMember = s"a ${barDef().i} b"/* assert: DisableToString
                                  ^^^^^^^^^^
-Only strings can be interpolated. Consider defining a `cats.Show` instance and using `show"...".toString` from `cats.syntax.show._`
+Only strings can be interpolated. Consider defining a `cats.Show[Int]` instance and using `show"..."` from `cats.syntax.show._`
 */
   val showInterpBarLit = show"a ${Bar(3)} b"
   val showInterpBarVal = show"a $barVal b"
   val showInterpBarDef = show"a ${barDef()} b"
 
-  // val allowedToString = Foo("foo").toString
-  // val allowedInterp = s"a ${Bar(1)} b"
-
   def badSingleton[S <: Singleton](s: S) = s"a $s b"/* assert: DisableToString
                                                 ^
-Only strings can be interpolated. Consider defining a `cats.Show` instance and using `show"...".toString` from `cats.syntax.show._`
+Only strings can be interpolated. Consider defining a `cats.Show[S]` instance and using `show"..."` from `cats.syntax.show._`
 */
   def goodSingleton[S <: Singleton with String](s: S) = s"a $s b"
 

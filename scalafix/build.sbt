@@ -6,8 +6,8 @@ ThisBuild / classLoaderLayeringStrategy := ClassLoaderLayeringStrategy.ScalaLibr
 inThisBuild(
   List(
     organization := "com.mrdziuban",
-    homepage := Some(url("https://github.com/mrdziuban/disable-tostring")),
-    scmInfo := Some(ScmInfo(url("https://github.com/mrdziuban/disable-tostring"), "git@github.com:mrdziuban/disable-tostring.git")),
+    homepage := Some(url("https://github.com/mrdziuban/disable-to-string")),
+    scmInfo := Some(ScmInfo(url("https://github.com/mrdziuban/disable-to-string"), "git@github.com:mrdziuban/disable-to-string.git")),
     developers := List(Developer("mrdziuban", "Matt Dziuban", "mrdziuban@gmail.com", url("https://github.com/mrdziuban"))),
     licenses := List("Apache-2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0")),
     scalaVersion := V.scala212,
