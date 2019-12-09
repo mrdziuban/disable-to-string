@@ -92,3 +92,5 @@ class DisableToString(global: ScalafixGlobal) extends SemanticRule("DisableToStr
     fixTree(doc.tree, global.newCompilationUnit(doc.input.text, doc.input.syntax)).atomic
   }
 }
+
+object DisableToString
