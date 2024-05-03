@@ -1,3 +1,7 @@
+# Deprecation notice
+
+Please see [mblink/disable-toString](https://github.com/mblink/disable-toString) for an alternative. It's a compiler plugin that supersedes the functionality of these rules and has been tested and used with real-world code.
+
 # Disable `toString`
 
 This repository contains a scalafix rule to disallow calls to `toString`, both explicit and implicit (i.e. in string
